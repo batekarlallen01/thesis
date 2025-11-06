@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiosk Application - North Caloocan City Hall</title>
+  <link rel="icon" href="{{ asset('img/mainlogo.png') }}" type="image/png">
+
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <style>
+    * { transition: all 0.2s ease; }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; opacity: 0; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .pulse-dot { animation: pulse 1.5s ease-in-out infinite; }
+    .pulse-dot:nth-child(2) { animation-delay: 0.2s; }
+    .pulse-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+    input:focus, button:focus, select:focus, textarea:focus { outline: none; }
+    .priority-badge { animation: pulse-glow 2s ease-in-out infinite; }
+    @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); } 50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); } }
+    @media print {
+      body * { visibility: hidden; }
+      #printReceipt, #printReceipt * { visibility: visible; }
+      #printReceipt { position: absolute; left: 0; top: 0; width: 100%; }
+      .print-receipt { width: 80mm; margin: 0 auto; padding: 10px; font-family: 'Courier New', monospace; font-size: 12px; }
+      .receipt-header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
+      .receipt-logo { width: 50px; height: 50px; margin: 0 auto 8px; }
+      .receipt-title { font-size: 14px; font-weight: bold; margin: 3px 0; }
+      .receipt-subtitle { font-size: 10px; margin: 2px 0; }
+      .queue-number-section { text-align: center; margin: 15px 0; padding: 10px; border: 3px solid #000; }
+      .queue-label { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+      .queue-number { font-size: 42px; font-weight: bold; letter-spacing: 3px; line-height: 1; }
+      .priority-badge-print { margin-top: 8px; padding: 4px 8px; border: 2px solid #000; display: inline-block; font-size: 11px; font-weight: bold; }
+      .receipt-info { margin: 10px 0; font-size: 11px; }
+      .info-row { display: flex; justify-content: space-between; margin: 5px 0; padding: 3px 0; border-bottom: 1px dotted #666; }
+      .info-label { font-weight: bold; width: 45%; }
+      .info-value { width: 55%; text-align: right; word-wrap: break-word; }
+      .receipt-footer { text-align: center; margin-top: 15px; padding-top: 10px; border-top: 2px dashed #000; font-size: 9px; }
+      .footer-note { margin: 3px 0; }
+      @page { margin: 0; }
+    }
+    #printReceipt { display: none; }
+  </style>
+
+  <!-- DEFINE ALPINE FUNCTION BEFORE Alpine.js LOADS -->
+  <script>
+    window.taxDeclarationApp = function() {
+      return {
+        form: {
+          requestType: '',
+          applicantType: '',
+          numberOfCopies: '',
+          ownerName: '',
+          age: null,
+          isPwdString: 'no',
+          pwdId: '',
+          pinLand: '',
+          pinBuilding: '',
+          pinMachinery: '',
+          purpose: '',
+          govtIdType: '',
+          govtIdNumber: '',
+          issuedAt: '',
+          issuedOn: '',
+          address: '',
+        },
+        showModal: false,
+        successModal: false,
+        isSubmitting: false,
+        queueNumber: '',
+        currentDateTime: '',
+
+        get priorityStatus() {
+          if (this.form.isPwdString === 'yes' && this.form.pwdId) {
+            return 'PWD';
+          }
+          if (this.form.age && this.form.age >= 60) {
+            return 'Senior';
+          }
+          return 'Regular';
+        },
+
+        get isFormValid() {
+          const baseValid = this.form.requestType && 
+                 this.form.applicantType && 
+                 this.form.numberOfCopies && 
+                 this.form.ownerName && 
+                 this.form.age &&
+                 this.form.isPwdString &&
+                 this.form.purpose && 
+                 this.form.govtIdType && 
+                 this.form.govtIdNumber && 
+                 this.form.address;
+          
+          if (this.form.isPwdString === 'yes') {
+            return baseValid && this.form.pwdId;
+          }
+          return baseValid;
+        },
+
+        showRequirementsModal() {
+          if (!this.isFormValid) {
+            alert('Please fill in all required fields marked with *');
+            return;
+          }
+          this.showModal = true;
+        },
+
+        getServiceTypeName(serviceType) {
+          const serviceNames = {
+            'tax_declaration': 'Tax Declaration (TD)',
+            'no_improvement': 'No Improvement',
+            'property_holdings': 'Property Holdings',
+            'non_property_holdings': 'Non-property Holdings'
+          };
+          return serviceNames[serviceType] || serviceType;
+        },
+
+        async confirmAndSubmit() {
+          this.showModal = false;
+          this.isSubmitting = true;
+
+          try {
+            const response = await fetch('/api/kiosk/entry', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+              },
+              body: JSON.stringify({
+                full_name: this.form.ownerName,
+                age: this.form.age,
+                is_pwd: this.form.isPwdString === 'yes',
+                pwd_id: this.form.isPwdString === 'yes' ? this.form.pwdId : null,
+                applicant_type: this.form.applicantType,
+                service_type: this.form.requestType,
+                number_of_copies: parseInt(this.form.numberOfCopies),
+                pin_land: this.form.pinLand,
+                pin_building: this.form.pinBuilding,
+                pin_machinery: this.form.pinMachinery,
+                purpose: this.form.purpose,
+                address: this.form.address,
+                govt_id_type: this.form.govtIdType,
+                govt_id_number: this.form.govtIdNumber,
+                issued_at: this.form.issuedAt,
+                issued_on: this.form.issuedOn
+              })
+            });
+
+            this.isSubmitting = false;
+
+            if (response.ok) {
+              const data = await response.json();
+              console.log('Success response:', data);
+              this.queueNumber = data.data.queue_number;
+              this.successModal = true;
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              console.error('Server error:', errorData);
+              
+              let errorMessage = 'Submission failed';
+              if (errorData.errors) {
+                const errors = Object.values(errorData.errors).flat();
+                errorMessage = errors.join('\n');
+              } else if (errorData.message) {
+                errorMessage = errorData.message;
+              }
+              alert(errorMessage);
+            }
+          } catch (err) {
+            this.isSubmitting = false;
+            console.error('Network error:', err);
+            alert('Failed to submit. Check your connection and try again.');
+          }
+        },
+
+        resetForm() {
+          this.form = {
+            requestType: '',
+            applicantType: '',
+            numberOfCopies: '',
+            ownerName: '',
+            age: null,
+            isPwdString: 'no',
+            pwdId: '',
+            pinLand: '',
+            pinBuilding: '',
+            pinMachinery: '',
+            purpose: '',
+            govtIdType: '',
+            govtIdNumber: '',
+            issuedAt: '',
+            issuedOn: '',
+            address: '',
+          };
+          this.successModal = false;
+          this.queueNumber = '';
+          window.scrollTo(0, 0);
+        }
+      };
+    };
+  </script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-gray-50 min-h-screen" x-data="taxDeclarationApp()">
+
+  <div class="max-w-4xl mx-auto mt-4 p-6 md:p-8">
+    <div class="text-center mb-8">
+      <img src="{{ asset('img/mainlogo.png') }}" alt="North Caloocan City Hall" class="w-16 h-16 mx-auto mb-3">
+      <h1 class="text-3xl font-bold text-gray-800">Kiosk Application</h1>
+      <p class="text-gray-600 mt-2">Complete the form to begin your application</p>
+      
+      <div x-show="priorityStatus !== 'Regular'" class="mt-4 inline-block">
+        <span class="priority-badge px-4 py-2 rounded-full text-sm font-semibold"
+              :class="{
+                'bg-green-100 text-green-800 border-2 border-green-500': priorityStatus === 'Senior',
+                'bg-blue-100 text-blue-800 border-2 border-blue-500': priorityStatus === 'PWD'
+              }">
+          ⭐ <span x-text="priorityStatus"></span> Citizen - Priority Access
+        </span>
+      </div>
+    </div>
+
+    <div class="bg-white shadow-lg rounded-xl p-6 md:p-8 space-y-6">
+      <div class="bg-purple-50 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold text-purple-900 mb-4">PERSONAL INFORMATION:</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.ownerName" placeholder="Enter full name"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Age <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="form.age" min="1" max="120" placeholder="Enter your age"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            <p x-show="form.age && form.age >= 60" class="text-sm text-green-600 font-semibold mt-2">
+              ✓ Senior Citizen - You will receive priority service
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
+        <h2 class="text-xl font-semibold text-blue-900 mb-4">PWD INFORMATION:</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-3">Are you a PWD (Person with Disability) beneficiary? <span class="text-red-500">*</span></label>
+            <div class="space-y-2">
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input type="radio" name="isPwd" value="no" x-model="form.isPwdString" @change="form.pwdId = ''" class="form-radio text-blue-600">
+                <span class="font-medium text-gray-800">No</span>
+              </label>
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input type="radio" name="isPwd" value="yes" x-model="form.isPwdString" class="form-radio text-blue-600">
+                <span class="font-medium text-gray-800">Yes, I am a PWD beneficiary</span>
+              </label>
+            </div>
+          </div>
+          <div x-show="form.isPwdString === 'yes'" x-transition class="pl-8">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">PWD ID Number <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.pwdId" placeholder="Enter your PWD ID number"
+                   class="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-green-50 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold text-green-900 mb-4">APPLICANT TYPE:</h2>
+        <div class="space-y-3">
+          <label class="flex items-center space-x-3 cursor-pointer">
+            <input type="radio" name="applicantType" value="owner" x-model="form.applicantType" class="form-radio text-green-600">
+            <span class="font-medium text-gray-800">Owner</span>
+          </label>
+          <label class="flex items-center space-x-3 cursor-pointer">
+            <input type="radio" name="applicantType" value="representative" x-model="form.applicantType" class="form-radio text-green-600">
+            <span class="font-medium text-gray-800">Representative with SPA or Authorization</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="bg-indigo-50 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold text-indigo-900 mb-4">REQUEST FOR:</h2>
+        <div class="space-y-3">
+          <label class="flex items-start space-x-3 cursor-pointer group">
+            <input type="radio" name="requestType" value="tax_declaration" x-model="form.requestType" class="mt-1 form-radio text-indigo-600">
+            <div class="flex-1">
+              <span class="font-medium text-gray-800">Certified True Copy of Tax Declaration (TD)</span>
+              <p class="text-sm text-gray-600" x-text="form.applicantType === 'representative' ? '₱100.00' : '₱50.00'"></p>
+            </div>
+          </label>
+          <label class="flex items-start space-x-3 cursor-pointer group">
+            <input type="radio" name="requestType" value="no_improvement" x-model="form.requestType" class="mt-1 form-radio text-indigo-600">
+            <div class="flex-1">
+              <span class="font-medium text-gray-800">Certification of No Improvement</span>
+              <p class="text-sm text-gray-600" x-text="form.applicantType === 'representative' ? '₱100.00' : '₱50.00'"></p>
+            </div>
+          </label>
+          <label class="flex items-start space-x-3 cursor-pointer group">
+            <input type="radio" name="requestType" value="property_holdings" x-model="form.requestType" class="mt-1 form-radio text-indigo-600">
+            <div class="flex-1">
+              <span class="font-medium text-gray-800">Certification of Property Holdings</span>
+              <p class="text-sm text-gray-600" x-text="form.applicantType === 'representative' ? '₱100.00' : '₱50.00'"></p>
+            </div>
+          </label>
+          <label class="flex items-start space-x-3 cursor-pointer group">
+            <input type="radio" name="requestType" value="non_property_holdings" x-model="form.requestType" class="mt-1 form-radio text-indigo-600">
+            <div class="flex-1">
+              <span class="font-medium text-gray-800">Certification of Non-property Holdings</span>
+              <p class="text-sm text-gray-600" x-text="form.applicantType === 'representative' ? '₱120.00' : '₱70.00'"></p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Number of Copies <span class="text-red-500">*</span></label>
+        <input type="number" x-model="form.numberOfCopies" min="1" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+      </div>
+
+      <div class="bg-yellow-50 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold text-yellow-900 mb-4">PROPERTY INDEX NUMBER (PIN):</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Land PIN</label>
+            <input type="text" x-model="form.pinLand" placeholder="Enter land PIN" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Building PIN</label>
+            <input type="text" x-model="form.pinBuilding" placeholder="Enter building PIN" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Machinery PIN</label>
+            <input type="text" x-model="form.pinMachinery" placeholder="Enter machinery PIN" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">PURPOSE <span class="text-red-500">*</span></label>
+        <textarea x-model="form.purpose" placeholder="State the purpose of this request" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"></textarea>
+      </div>
+
+      <div class="bg-blue-50 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold text-blue-900 mb-4">GOVERNMENT ISSUED ID:</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">ID Type <span class="text-red-500">*</span></label>
+            <select x-model="form.govtIdType" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Select ID Type</option>
+              <option value="drivers_license">Driver's License</option>
+              <option value="passport">Passport</option>
+              <option value="umid">UMID</option>
+              <option value="sss">SSS ID</option>
+              <option value="philhealth">PhilHealth ID</option>
+              <option value="postal">Postal ID</option>
+              <option value="voters">Voter's ID</option>
+              <option value="national_id">National ID</option>
+              <option value="prc">PRC ID</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">ID Number <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.govtIdNumber" placeholder="Enter ID number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Issued at</label>
+            <input type="text" x-model="form.issuedAt" placeholder="Place where ID was issued" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Issued on</label>
+            <input type="date" x-model="form.issuedOn" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">ADDRESS <span class="text-red-500">*</span></label>
+        <textarea x-model="form.address" placeholder="Enter complete address" rows="2" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"></textarea>
+      </div>
+
+      <div class="pt-6 border-t">
+        <button @click="showRequirementsModal" type="button"
+                :disabled="!isFormValid"
+                :class="{'bg-gray-400 cursor-not-allowed': !isFormValid, 'bg-indigo-600 hover:bg-indigo-700': isFormValid}"
+                class="w-full text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-300 transform hover:scale-105">
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Requirements Modal -->
+  <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-700/60 z-50 flex items-center justify-center px-4">
+    <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="w-full max-w-4xl h-[90vh] bg-[#f5f5f4] border border-white rounded-2xl p-6 shadow-xl flex flex-col overflow-hidden">
+
+      <div class="mb-4">
+        <h1 class="text-xl md:text-2xl font-bold text-black font-serif mb-1">Required Documents</h1>
+        <p class="text-sm text-gray-800">Please prepare the following documents for your application.</p>
+      </div>
+
+      <div class="mb-4 p-3 bg-white rounded-lg border border-gray-300">
+        <p class="text-sm font-medium text-gray-700">
+          Selected Role: <span class="text-indigo-600 font-semibold" x-text="form.applicantType === 'owner' ? 'Property Owner' : 'Authorized Representative'"></span>
+        </p>
+      </div>
+
+      <template x-if="form.applicantType === 'owner'">
+        <div class="mb-4 space-y-3">
+          <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded-md shadow-sm animate-fade-in">
+            <strong>Owner's Valid ID</strong>
+            <p class="text-green-700 text-xs mt-1">Government-issued photo ID</p>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="form.applicantType === 'representative'">
+        <div class="mb-4 space-y-3">
+          <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-md shadow-sm">
+            <strong>Special Power of Attorney (SPA)</strong>
+            <p class="text-blue-700 text-xs mt-1">Must be notarized</p>
+          </div>
+          <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-md shadow-sm">
+            <strong>Representative's Valid ID</strong>
+          </div>
+        </div>
+      </template>
+
+      <div class="flex-1 min-h-0 overflow-y-auto pr-2 space-y-3">
+        <div class="bg-white p-3 rounded-md shadow-sm">Request for Issuance of Updated Tax Declaration</div>
+        <div class="bg-white p-3 rounded-md shadow-sm">Title (Certified True Xerox Copy)</div>
+        <div class="bg-white p-3 rounded-md shadow-sm">Updated Real Property Tax Payment</div>
+        <div class="bg-white p-3 rounded-md shadow-sm">Latest Tax Declaration (TD/OHA)</div>
+      </div>
+
+      <div class="pt-4 border-t border-gray-300 mt-4 flex gap-3">
+        <button @click="showModal = false" type="button" class="flex-1 px-6 py-3 text-lg font-semibold rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all">Go Back</button>
+        <button @click="confirmAndSubmit" type="button" :disabled="isSubmitting" :class="{'opacity-50 cursor-not-allowed': isSubmitting}" class="flex-1 px-6 py-3 text-lg font-semibold rounded-md text-white bg-amber-600 hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+          <span x-show="!isSubmitting">I Have These Documents</span>
+          <span x-show="isSubmitting">Processing...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div x-show="successModal" x-transition class="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+      <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+      <h2 class="text-3xl font-bold text-green-600 mb-2">Added to Queue!</h2>
+      <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+        <p class="text-sm text-gray-600 mb-2">Your Queue Number:</p>
+        <p class="text-5xl font-bold text-blue-600" x-text="queueNumber"></p>
+      </div>
+      <div x-show="priorityStatus !== 'Regular'" class="mb-4">
+        <span class="px-4 py-2 rounded-full text-sm font-semibold inline-block" :class="{'bg-green-100 text-green-800': priorityStatus === 'Senior', 'bg-blue-100 text-blue-800': priorityStatus === 'PWD'}">
+          ⭐ <span x-text="priorityStatus"></span> Citizen - Priority Queue
+        </span>
+      </div>
+      <p class="text-gray-600 mb-4">Please wait for your number to be called.</p>
+      <p class="text-sm text-indigo-600 font-semibold mb-6">✓ Receipt has been printed</p>
+      <button @click="resetForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-medium transition">
+        Submit Another Application
+      </button>
+    </div>
+  </div>
+
+</body>
+</html>
