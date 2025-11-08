@@ -105,27 +105,43 @@ class MailboxSubmissionController extends Controller
 
     /**
      * Get all submissions for admin panel
+     * Only returns pending and submitted (active) submissions
      */
     public function index(Request $request)
     {
-        $query = MailboxSubmission::query();
+        try {
+            $query = MailboxSubmission::query();
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+            // FIXED: Only show pending and submitted submissions (filter out completed/disapproved)
+            $query->whereIn('status', ['pending', 'submitted']);
+
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('full_name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('pin_code', 'like', "%{$search}%");
+                });
+            }
+
+            $submissions = $query->orderBy('created_at', 'desc')->get();
+
+            return response()->json($submissions);
+        } catch (\Exception $e) {
+            Log::error('Error fetching mailbox submissions', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch submissions: ' . $e->getMessage()
+            ], 500);
         }
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('pin_code', 'like', "%{$search}%");
-            });
-        }
-
-        $submissions = $query->orderBy('created_at', 'desc')->get();
-
-        return response()->json($submissions);
     }
 
     /**
@@ -133,11 +149,23 @@ class MailboxSubmissionController extends Controller
      */
     public function show($id)
     {
-        $submission = MailboxSubmission::findOrFail($id);
-        
-        return response()->json([
-            'submission' => $submission
-        ]);
+        try {
+            $submission = MailboxSubmission::findOrFail($id);
+            
+            return response()->json([
+                'submission' => $submission
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching mailbox submission', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Submission not found'
+            ], 404);
+        }
     }
 
     /**
@@ -223,7 +251,7 @@ class MailboxSubmissionController extends Controller
                 Log::error('QR Code generation failed', ['error' => $e->getMessage()]);
             }
 
-            // Send QR code email to applicant
+            // Send QR code email to applicant using PreRegistration model
             try {
                 Mail::to($submission->email)->send(new PreRegistrationSubmittedMail($preReg));
                 Log::info('QR code email sent', ['to' => $submission->email, 'pre_reg_id' => $preReg->id]);
@@ -250,6 +278,7 @@ class MailboxSubmissionController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Error approving mailbox submission', [
+                'id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -266,24 +295,51 @@ class MailboxSubmissionController extends Controller
      */
     public function disapproveMail($id)
     {
-        $submission = MailboxSubmission::findOrFail($id);
-        
-        if ($submission->status !== 'submitted') {
+        try {
+            $submission = MailboxSubmission::findOrFail($id);
+            
+            if ($submission->status !== 'submitted') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Can only disapprove submitted documents'
+                ], 400);
+            }
+
+            $submission->update([
+                'status' => 'disapproved',
+                'disapproved_at' => now()
+            ]);
+
+            // Send disapproval email
+            try {
+                Mail::send('emails.mailbox-disapproved', [
+                    'submission' => $submission
+                ], function ($message) use ($submission) {
+                    $message->to($submission->email)
+                        ->subject('Document Submission Disapproved - Action Required');
+                });
+                
+                Log::info('Disapproval email sent', ['to' => $submission->email, 'id' => $submission->id]);
+            } catch (\Exception $e) {
+                Log::error('Failed to send disapproval email: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Submission disapproved successfully'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error disapproving mailbox submission', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Can only disapprove submitted documents'
-            ], 400);
+                'message' => 'Failed to disapprove submission: ' . $e->getMessage()
+            ], 500);
         }
-
-        $submission->update([
-            'status' => 'disapproved',
-            'disapproved_at' => now()
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Submission disapproved successfully'
-        ]);
     }
 
     /**
@@ -298,6 +354,8 @@ class MailboxSubmissionController extends Controller
                 $message->to($submission->email)
                     ->subject('Document Drop-off Application Confirmation - PIN: ' . $submission->pin_code);
             });
+            
+            Log::info('Confirmation email sent', ['to' => $submission->email, 'pin' => $submission->pin_code]);
         } catch (\Exception $e) {
             Log::error('Failed to send confirmation email: ' . $e->getMessage());
         }

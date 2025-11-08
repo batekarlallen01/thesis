@@ -14,6 +14,9 @@ class MailboxSubmission extends Model
         'applicant_type',
         'number_of_copies',
         'full_name',
+        'age',
+        'is_pwd',
+        'pwd_id',
         'pin_land',
         'pin_building',
         'pin_machinery',
@@ -25,15 +28,38 @@ class MailboxSubmission extends Model
         'address',
         'email',
         'pin_code',
+        'qr_token',
+        'qr_expires_at',
+        'qr_image_path',
+        'has_entered_queue',
+        'pre_registration_id',
         'status',
+        'submitted_at',
+        'approved_at',
+        'disapproved_at',
         'collected_at'
     ];
 
     protected $casts = [
         'issued_on' => 'date',
+        'submitted_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'disapproved_at' => 'datetime',
         'collected_at' => 'datetime',
-        'number_of_copies' => 'integer'
+        'qr_expires_at' => 'datetime',
+        'number_of_copies' => 'integer',
+        'age' => 'integer',
+        'is_pwd' => 'boolean',
+        'has_entered_queue' => 'boolean'
     ];
+
+    /**
+     * Relationship with PreRegistration
+     */
+    public function preRegistration()
+    {
+        return $this->belongsTo(PreRegistration::class);
+    }
 
     /**
      * Generate a unique 6-digit PIN code

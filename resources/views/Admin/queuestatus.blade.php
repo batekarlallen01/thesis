@@ -10,6 +10,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
@@ -26,6 +27,7 @@
         .content-text { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
         .modal-overlay { background: rgba(0, 0, 0, 0.5); }
         .btn-disabled { opacity: 0.5; cursor: not-allowed; }
+        [x-cloak] { display: none !important; }
     </style>
 
     <script>
@@ -36,6 +38,7 @@
                 pendingActionName: '',
                 nowServingActive: false,
                 isProcessing: false,
+                showModal: false,
 
                 init() {
                     this.updateDateTime();
@@ -153,28 +156,24 @@
                         ...options
                     };
 
-                    try {
-                        const response = await fetch(url, config);
-                        const data = await response.json();
-                        
-                        if (!response.ok) {
-                            throw new Error(data.message || `HTTP ${response.status}`);
-                        }
-                        
-                        if (data.success) {
-                            this.showNotification(data.message || 'Action successful', 'success');
-                            await this.fetchQueueData();
-                            if ((url === "/admin/queue/next" || url === "/admin/queue/recall-now") && data.now_serving?.queue_number) {
-                                this.announceQueueNumber(data.now_serving.queue_number);
-                            }
-                        } else {
-                            this.showNotification(data.message || 'Action failed', 'error');
-                        }
-                    } catch (error) {
-                        console.error('Request error:', error);
-                        this.showNotification(error.message || 'An error occurred', 'error');
-                        throw error;
+                    const response = await fetch(url, config);
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.message || `HTTP ${response.status}`);
                     }
+                    
+                    if (data.success) {
+                        this.showNotification(data.message || 'Action successful', 'success');
+                        await this.fetchQueueData();
+                        if ((url === "/admin/queue/next" || url === "/admin/queue/recall-now") && data.now_serving?.queue_number) {
+                            this.announceQueueNumber(data.now_serving.queue_number);
+                        }
+                    } else {
+                        throw new Error(data.message || 'Action failed');
+                    }
+                    
+                    return data;
                 },
 
                 announceQueueNumber(queueNum) {
@@ -211,53 +210,67 @@
                     this.makeRequest("/admin/queue/recall-now"); 
                 },
                 
-                cancelNowServing() { 
+                cancelNowServing() {
+                    console.log('cancelNowServing called');
                     if (!this.nowServingActive) {
                         this.showNotification('No one is currently being served', 'error');
                         return;
                     }
-                    this.pendingActionName = 'Cancel';
-                    this.pendingAction = () => this.makeRequest("/admin/queue/cancel-now");
+                    this.pendingActionName = 'cancel';
+                    this.pendingAction = "/admin/queue/cancel-now";
+                    console.log('Opening modal for cancel');
                     this.openModal(); 
                 },
                 
-                requeueNowServing() { 
+                requeueNowServing() {
+                    console.log('requeueNowServing called');
                     if (!this.nowServingActive) {
                         this.showNotification('No one is currently being served', 'error');
                         return;
                     }
-                    this.pendingActionName = 'Requeue';
-                    this.pendingAction = () => this.makeRequest("/admin/queue/requeue-now");
+                    this.pendingActionName = 'requeue';
+                    this.pendingAction = "/admin/queue/requeue-now";
+                    console.log('Opening modal for requeue');
                     this.openModal(); 
                 },
                 
-                openModal() { 
-                    const modal = document.getElementById('confirmationModal');
-                    modal.style.display = 'block';
+                openModal() {
+                    console.log('openModal called');
+                    this.showModal = true;
+                    console.log('showModal set to:', this.showModal);
                 },
                 
-                closeModal() { 
-                    const modal = document.getElementById('confirmationModal');
-                    modal.style.display = 'none';
+                closeModal() {
+                    console.log('closeModal called');
+                    this.showModal = false;
                     this.pendingAction = null;
                     this.pendingActionName = '';
                     this.isProcessing = false;
                 },
                 
                 async confirmPendingAction() {
+                    console.log('confirmPendingAction called');
+                    console.log('pendingAction:', this.pendingAction);
+                    console.log('isProcessing:', this.isProcessing);
+                    
                     if (!this.pendingAction || this.isProcessing) {
+                        console.log('Exiting - no action or already processing');
                         return;
                     }
                     
                     this.isProcessing = true;
+                    console.log('Set isProcessing to true');
                     
                     try {
-                        await this.pendingAction();
-                        this.pendingAction = null;
-                        this.pendingActionName = '';
+                        console.log('Making request to:', this.pendingAction);
+                        await this.makeRequest(this.pendingAction);
+                        console.log('Request successful, closing modal');
                         this.closeModal();
                     } catch (error) {
                         console.error('Error executing action:', error);
+                        this.showNotification(error.message || 'Action failed', 'error');
+                    } finally {
+                        console.log('Finally block - resetting isProcessing');
                         this.isProcessing = false;
                     }
                 }
@@ -439,33 +452,39 @@
                     </div>
                 </div>
             </section>
-        </main>
-    </div>
 
-    <div id="confirmationModal" class="fixed inset-0 z-[9999]" style="display: none;">
-        <div class="absolute inset-0 bg-black bg-opacity-50" @click="!isProcessing && closeModal()"></div>
-        <div class="relative z-10 flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-georgia font-semibold">Confirm Action</h3>
-                    <button @click="!isProcessing && closeModal()" class="text-gray-500 hover:text-gray-700 p-2" :disabled="isProcessing"><i class="fas fa-times"></i></button>
-                </div>
-                <p class="mb-6 text-gray-700 content-text">Are you sure you want to <span x-text="pendingActionName.toLowerCase()"></span> this client?</p>
-                <div class="flex justify-end gap-3">
-                    <button @click="closeModal()" class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition content-text" :disabled="isProcessing" :class="{ 'opacity-50 cursor-not-allowed': isProcessing }">Cancel</button>
-                    <button @click="confirmPendingAction()" class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition content-text flex items-center justify-center min-w-[100px]" :disabled="isProcessing" :class="{ 'opacity-50 cursor-not-allowed': isProcessing }">
-                        <span x-show="!isProcessing">Confirm</span>
-                        <span x-show="isProcessing" class="flex items-center">
-                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Processing...
-                        </span>
-                    </button>
+            <!-- Modal (inside main Alpine component) -->
+            <div x-show="showModal" 
+                 x-cloak
+                 class="fixed inset-0 z-[9999]"
+                 style="display: none;">
+                <div class="absolute inset-0 bg-black bg-opacity-50" @click="console.log('Overlay clicked'); !isProcessing && closeModal()"></div>
+                <div class="relative z-10 flex items-center justify-center min-h-screen p-4">
+                    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" @click.stop>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-georgia font-semibold">Confirm Action</h3>
+                            <button @click="console.log('X clicked'); closeModal()" class="text-gray-500 hover:text-gray-700 p-2" :disabled="isProcessing">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <p class="mb-6 text-gray-700 content-text">Are you sure you want to <span x-text="pendingActionName"></span> this client?</p>
+                        <div class="flex justify-end gap-3">
+                            <button @click="console.log('Cancel clicked'); closeModal()" class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition content-text" :disabled="isProcessing" :class="{ 'opacity-50 cursor-not-allowed': isProcessing }">Cancel</button>
+                            <button @click="console.log('Confirm clicked'); confirmPendingAction()" class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition content-text flex items-center justify-center min-w-[100px]" :disabled="isProcessing" :class="{ 'opacity-50 cursor-not-allowed': isProcessing }">
+                                <span x-show="!isProcessing">Confirm</span>
+                                <span x-show="isProcessing" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <div id="notification" class="fixed top-4 right-4 hidden px-4 py-2 rounded-lg text-white text-sm font-semibold z-50 shadow-lg transition-opacity duration-300 content-text">Action successful!</div>
