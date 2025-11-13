@@ -40,9 +40,6 @@ class DashboardController extends Controller
                 ->where('has_entered_queue', 0)
                 ->count();
 
-            // Alternative: Count all pre_registrations
-            // $preRegistered = DB::table('pre_registrations')->count();
-
             // CANCELLED TODAY
             // Count entries from 'queues' table with status 'cancelled' updated today
             $cancelled = DB::table('queues')
@@ -57,22 +54,12 @@ class DashboardController extends Controller
                 ->whereDate('completed_at', $today)
                 ->count();
 
-            // Alternative: Use updated_at instead of completed_at
-            // $completed = DB::table('queues')
-            //     ->where('status', 'completed')
-            //     ->whereDate('updated_at', $today)
-            //     ->count();
-
-            // MAILBOX MESSAGES
-            // Count pending mailbox submissions
+            // MAILBOX MESSAGES - FIXED
+            // Count active mailbox submissions (pending OR submitted)
+            // These are the ones that haven't been approved or disapproved yet
             $mailboxMessages = DB::table('mailbox_submissions')
-                ->where('status', 'pending')
+                ->whereIn('status', ['pending', 'submitted'])
                 ->count();
-
-            // Alternative: Count all unprocessed (pending or submitted)
-            // $mailboxMessages = DB::table('mailbox_submissions')
-            //     ->whereIn('status', ['pending', 'submitted'])
-            //     ->count();
 
             return [
                 'pre_registered' => $preRegistered,
@@ -150,12 +137,16 @@ class DashboardController extends Controller
                         ->where('status', 'submitted')
                         ->count(),
                     
-                    'processing' => DB::table('mailbox_submissions')
-                        ->where('status', 'processing')
+                    'approved' => DB::table('mailbox_submissions')
+                        ->where('status', 'completed')
                         ->count(),
                     
-                    'completed' => DB::table('mailbox_submissions')
-                        ->where('status', 'completed')
+                    'disapproved' => DB::table('mailbox_submissions')
+                        ->where('status', 'disapproved')
+                        ->count(),
+                    
+                    'total_active' => DB::table('mailbox_submissions')
+                        ->whereIn('status', ['pending', 'submitted'])
                         ->count(),
                     
                     'total_today' => DB::table('mailbox_submissions')

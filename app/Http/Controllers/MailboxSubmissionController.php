@@ -253,7 +253,12 @@ class MailboxSubmissionController extends Controller
 
             // Send QR code email to applicant using PreRegistration model
             try {
-                Mail::to($submission->email)->send(new PreRegistrationSubmittedMail($preReg));
+                Mail::send('emails.mailbox-approved', [
+                    'preReg' => $preReg
+                ], function ($message) use ($submission) {
+                    $message->to($submission->email)
+                        ->subject('Request Approved - QR Code for Queueing');
+                });
                 Log::info('QR code email sent', ['to' => $submission->email, 'pre_reg_id' => $preReg->id]);
             } catch (\Exception $e) {
                 Log::error('Email sending failed', ['error' => $e->getMessage()]);
@@ -291,11 +296,17 @@ class MailboxSubmissionController extends Controller
     }
 
     /**
-     * Admin disapproves submission
+     * Admin disapproves submission with specific reasons
      */
-    public function disapproveMail($id)
+    public function disapproveMail($id, Request $request)
     {
         try {
+            $validated = $request->validate([
+                'incorrect_documents' => 'required|array',
+                'incorrect_documents.*' => 'string',
+                'other_reason' => 'nullable|string|max:1000'
+            ]);
+
             $submission = MailboxSubmission::findOrFail($id);
             
             if ($submission->status !== 'submitted') {
@@ -305,21 +316,37 @@ class MailboxSubmissionController extends Controller
                 ], 400);
             }
 
+            // Ensure we have at least one reason
+            if (empty($validated['incorrect_documents']) && empty($validated['other_reason'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please provide at least one reason for disapproval'
+                ], 422);
+            }
+
             $submission->update([
                 'status' => 'disapproved',
-                'disapproved_at' => now()
+                'disapproved_at' => now(),
+                'disapproval_reasons' => $validated['incorrect_documents'],
+                'disapproval_other_reason' => $validated['other_reason'] ?? null
             ]);
 
-            // Send disapproval email
+            // Send disapproval email with reasons
             try {
                 Mail::send('emails.mailbox-disapproved', [
-                    'submission' => $submission
+                    'submission' => $submission,
+                    'incorrectDocuments' => $validated['incorrect_documents'],
+                    'otherReason' => $validated['other_reason'] ?? null
                 ], function ($message) use ($submission) {
                     $message->to($submission->email)
                         ->subject('Document Submission Disapproved - Action Required');
                 });
                 
-                Log::info('Disapproval email sent', ['to' => $submission->email, 'id' => $submission->id]);
+                Log::info('Disapproval email sent', [
+                    'to' => $submission->email, 
+                    'id' => $submission->id,
+                    'reasons' => $validated['incorrect_documents']
+                ]);
             } catch (\Exception $e) {
                 Log::error('Failed to send disapproval email: ' . $e->getMessage());
             }

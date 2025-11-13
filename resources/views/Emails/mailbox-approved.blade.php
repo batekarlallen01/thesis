@@ -20,75 +20,66 @@
         .steps h3 { color: #92400e; margin-top: 0; }
         .steps ol { margin: 10px 0; padding-left: 20px; }
         .steps li { margin: 8px 0; }
-        .warning { background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }
         .footer { background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 13px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>✅ Documents Approved!</h1>
-            <p>North Caloocan City Hall - IoT Mailbox System</p>
+            <h1>✅ Request Approved!</h1>
+            <p>North Caloocan City Hall - Document Request</p>
         </div>
         
         <div class="content">
             <span class="badge">APPROVED</span>
             
-            <p style="font-size: 16px; margin-top: 15px;">Dear <strong>{{ $submission->full_name }}</strong>,</p>
+            <p style="font-size: 16px; margin-top: 15px;">Dear <strong>{{ $preReg->full_name }}</strong>,</p>
             
-            <p>Great news! Your documents have been <strong>physically verified and approved</strong> by our staff.</p>
+            <p>Your request has been <strong>approved</strong>.</p>
             
             <div class="qr-section">
-                <h3 style="margin-bottom: 5px;">🎫 Your Queue Entry QR Code</h3>
-                <p style="font-size: 14px; color: #059669; margin: 5px 0;">Scan this at our kiosk to enter the queue</p>
+                <h3>🎫 Your QR Code for Queueing</h3>
                 
-                @if($submission->qr_image_path)
-                    <img src="{{ $submission->qr_image_url }}" alt="Queue Entry QR Code">
+                @if($preReg->qr_image_path)
+                    <img src="{{ $message->embed(storage_path('app/public/qrcodes/' . $preReg->qr_image_path)) }}" alt="Queue QR Code">
+                @else
+                    <p style="color: #dc2626;">QR Code generation in progress. Please check your email again in a few moments.</p>
                 @endif
                 
-                <p style="font-size: 13px; color: #f59e0b; font-weight: bold; margin: 10px 0;">⏰ Valid for 24 hours</p>
-                <p style="font-size: 12px; color: #6b7280;">Expires: {{ $submission->qr_expires_at->format('F d, Y - h:i A') }}</p>
+                <p style="font-size: 14px; color: #059669; margin: 15px 0;">
+                    <strong>Please go to the City Hall to claim your requested file.</strong>
+                </p>
+                <p style="font-size: 13px; color: #6b7280;">
+                    Scan this QR code at our kiosk when you arrive.
+                </p>
             </div>
             
             <div class="info-box">
-                <strong>📋 Service:</strong> {{ $submission->service_type_name }}<br>
-                <strong>👤 Applicant:</strong> {{ ucfirst($submission->applicant_type) }}<br>
-                <strong>📄 Copies:</strong> {{ $submission->number_of_copies }}<br>
-                <strong>📅 Approved:</strong> {{ $submission->approved_at->format('M d, Y h:i A') }}<br>
-                <strong>💰 Fee:</strong> ₱{{ number_format($submission->getFeeAmount(), 2) }}
+                <strong>📋 Service Requested:</strong> {{ $preReg->service_type_name }}<br>
+                <strong>📅 Approved:</strong> {{ now()->format('M d, Y h:i A') }}
             </div>
             
             <div class="steps">
-                <h3>📍 Next Steps:</h3>
+                <h3>📍 What to do next:</h3>
                 <ol>
-                    <li><strong>Visit North Caloocan City Hall</strong> within 24 hours</li>
-                    <li><strong>Go to the QR Scanner Kiosk</strong> at the entrance</li>
-                    <li><strong>Scan the QR code</strong> shown above or attached to this email</li>
-                    <li><strong>Get your queue number</strong> and wait for your turn</li>
-                    <li><strong>Proceed to the counter</strong> when called</li>
+                    <li>Visit <strong>North Caloocan City Hall</strong></li>
+                    <li>Scan your QR code at the kiosk</li>
+                    <li>Get your queue number</li>
+                    <li>Wait for your turn to be called</li>
+                    <li>Claim your requested file at the counter</li>
                 </ol>
             </div>
             
-            <div class="warning">
-                <strong>⚠️ Important Reminders:</strong>
-                <ul style="margin: 10px 0; padding-left: 20px;">
-                    <li>QR code is valid for <strong>24 hours only</strong></li>
-                    <li>One-time use - expires after scanning</li>
-                    <li>Bring payment for processing fees</li>
-                    <li>Arrive during office hours (Mon-Fri, 8AM-5PM)</li>
-                </ul>
-            </div>
-            
             <p style="text-align: center; margin-top: 25px; color: #059669; font-weight: bold;">
-                Thank you for using our IoT Mailbox System! 🎉
+                Thank you!
             </p>
         </div>
         
         <div class="footer">
             <p><strong>North Caloocan City Hall</strong><br>
-            Assessor's Office - Queue Management System</p>
-            <p style="margin: 10px 0;">This is an automated email. Please do not reply.</p>
-            <p>For inquiries, visit our office during business hours.</p>
+            Assessor's Office</p>
+            <p style="margin: 10px 0;"><strong>Office Hours:</strong> Monday - Friday, 8:00 AM - 5:00 PM</p>
+            <p>This is an automated email. Please do not reply.</p>
         </div>
     </div>
 </body>

@@ -13,10 +13,15 @@
         .badge { display: inline-block; background: #dc2626; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; }
         .reason-box { background: #fef2f2; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #dc2626; }
         .reason-box h3 { color: #991b1b; margin-top: 0; }
+        .incorrect-list { list-style: none; padding: 0; margin: 15px 0; }
+        .incorrect-list li { padding: 10px; margin: 8px 0; background: white; border-left: 3px solid #dc2626; border-radius: 4px; display: flex; align-items: center; }
+        .incorrect-list li:before { content: "✗"; color: #dc2626; font-weight: bold; margin-right: 10px; font-size: 18px; }
         .info-box { background: #f9fafb; padding: 15px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #6b7280; }
         .info-box strong { color: #1f2937; }
         .resubmit-box { background: #eff6ff; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0; }
         .resubmit-box h3 { color: #1e40af; margin-top: 0; }
+        .other-reason-box { background: #fffbeb; padding: 15px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #f59e0b; }
+        .other-reason-box strong { color: #92400e; }
         .footer { background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 13px; }
     </style>
 </head>
@@ -36,47 +41,59 @@
             
             <div class="reason-box">
                 <h3>📋 Reason for Disapproval:</h3>
-                <p style="font-size: 15px; line-height: 1.8;">
-                    <strong>Incomplete or incorrect requirements submitted.</strong>
+                <p style="font-size: 15px; line-height: 1.8; margin-bottom: 10px;">
+                    <strong>The following documents are incorrect, incomplete, or missing:</strong>
                 </p>
-                <p style="margin-top: 15px; font-size: 14px;">
-                    After reviewing your documents, our staff found that the submitted requirements do not meet the criteria for processing. This may include:
-                </p>
-                <ul style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
-                    <li>Missing required documents</li>
-                    <li>Incomplete information on forms</li>
-                    <li>Documents not properly authenticated</li>
-                    <li>Expired or invalid identification</li>
-                    <li>Incorrect document type submitted</li>
+                
+                @if(!empty($incorrectDocuments))
+                <ul class="incorrect-list">
+                    @foreach($incorrectDocuments as $doc)
+                    <li>{{ $doc }}</li>
+                    @endforeach
                 </ul>
+                @endif
+                
+                @if(!empty($otherReason))
+                <div class="other-reason-box">
+                    <strong>📝 Additional Notes:</strong>
+                    <p style="margin: 10px 0 0 0; line-height: 1.6;">{{ $otherReason }}</p>
+                </div>
+                @endif
             </div>
             
             <div class="info-box">
                 <strong>📋 Service Requested:</strong> {{ $submission->service_type_name }}<br>
-                <strong>👤 Applicant:</strong> {{ ucfirst($submission->applicant_type) }}<br>
-                <strong>📧 PIN Code:</strong> {{ $submission->pin_code }}<br>
+                <strong>👤 Applicant Type:</strong> {{ ucfirst($submission->applicant_type) }}<br>
+                <strong>🔢 PIN Code:</strong> {{ $submission->pin_code }}<br>
                 <strong>📅 Disapproved:</strong> {{ $submission->disapproved_at->format('M d, Y h:i A') }}
             </div>
             
             <div class="resubmit-box">
                 <h3>🔄 What to Do Next:</h3>
-                <ol style="margin: 10px 0; padding-left: 20px;">
-                    <li><strong>Review the requirements</strong> for {{ $submission->service_type_name }}</li>
-                    <li><strong>Prepare the complete documents</strong> as specified</li>
+                <ol style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+                    <li><strong>Review the list above</strong> to identify which documents need correction</li>
+                    <li><strong>Prepare the correct documents</strong> according to the requirements</li>
+                    <li><strong>Ensure all documents are:</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li>Complete and properly filled out</li>
+                            <li>Properly authenticated or notarized (if required)</li>
+                            <li>Valid and not expired</li>
+                            <li>Clear and legible copies</li>
+                        </ul>
+                    </li>
                     <li><strong>Submit a new application</strong> through our online portal</li>
                     <li><strong>Use the new PIN code</strong> to drop off corrected documents</li>
                 </ol>
-                <p style="margin-top: 15px; font-size: 14px;">
-                    <strong>Need help?</strong> Visit our office during business hours for assistance in preparing your documents.
-                </p>
             </div>
             
-            <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
-                <strong>💡 Tip:</strong> You can visit our office to inquire about the specific documents that need correction before resubmitting.
+            <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e; margin: 20px 0;">
+                <strong>💡 Need Assistance?</strong>
+                <p style="margin: 10px 0 0 0;">Visit our office during business hours for guidance on preparing the correct documents. Our staff will be happy to help you understand the requirements.</p>
             </div>
             
-            <p style="text-align: center; margin-top: 25px; color: #6b7280;">
-                We apologize for any inconvenience. Thank you for your understanding.
+            <p style="text-align: center; margin-top: 25px; color: #6b7280; font-size: 14px;">
+                We apologize for any inconvenience. Please ensure all documents are correct before resubmitting.<br>
+                Thank you for your understanding and cooperation.
             </p>
         </div>
         
