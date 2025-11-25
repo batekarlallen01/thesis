@@ -33,10 +33,17 @@ class Queue extends Model
         'purpose',
         'address',
         'applicant_type',
+        // Owner's Government ID
         'govt_id_type',
         'govt_id_number',
         'issued_at',
         'issued_on',
+        // Representative's Government ID (new fields)
+        'rep_govt_id_type',
+        'rep_govt_id_number',
+        'rep_issued_at',
+        'rep_issued_on',
+        // Property Index Numbers
         'pin_land',
         'pin_building',
         'pin_machinery',
@@ -48,7 +55,9 @@ class Queue extends Model
         'served_at' => 'datetime',
         'completed_at' => 'datetime',
         'form_data' => 'array',
-        'birthdate' => 'date'
+        'birthdate' => 'date',
+        'issued_on' => 'date',
+        'rep_issued_on' => 'date',
     ];
 
     /**
@@ -91,43 +100,39 @@ class Queue extends Model
     }
 
     /**
-     * Scope for active queue items (waiting or serving)
-     */
-    public function scopeActive($query)
-    {
-        return $query->whereIn('status', ['waiting', 'serving']);
-    }
-
-    /**
-     * Scope for waiting items only
+     * Scope to get waiting queue items (excluding requeued)
      */
     public function scopeWaiting($query)
     {
-        return $query->where('status', 'waiting');
+        return $query->where('status', 'waiting')
+                     ->orderBy('queue_entered_at', 'asc');
     }
 
     /**
-     * Scope for priority queue
+     * Scope to get priority queue (PWD and Senior Citizens, excluding requeued)
      */
     public function scopePriority($query)
     {
-        return $query->whereIn('priority_type', ['PWD', 'Senior'])
-            ->waiting()
-            ->orderBy('queue_entered_at', 'asc');
+        return $query->where('status', 'waiting')
+                     ->whereIn('priority_type', ['PWD', 'Senior'])
+                     ->orderBy('queue_entered_at', 'asc');
     }
 
     /**
-     * Scope for regular queue
+     * Scope to get regular queue (excluding priority and requeued)
      */
     public function scopeRegular($query)
     {
-        return $query->where('priority_type', 'Regular')
-            ->waiting()
-            ->orderBy('queue_entered_at', 'asc');
+        return $query->where('status', 'waiting')
+                     ->where(function($q) {
+                         $q->whereNull('priority_type')
+                           ->orWhere('priority_type', 'Regular');
+                     })
+                     ->orderBy('queue_entered_at', 'asc');
     }
 
     /**
-     * Get currently serving client
+     * Get currently serving queue item
      */
     public static function getCurrentlyServing()
     {
@@ -137,44 +142,47 @@ class Queue extends Model
     /**
      * Mark this queue item as serving
      */
-    public function markAsServing(): void
+    public function markAsServing()
     {
         $this->update([
             'status' => 'serving',
-            'served_at' => now()
+            'served_at' => now(),
         ]);
     }
 
     /**
      * Mark this queue item as completed
      */
-    public function markAsCompleted(): void
+    public function markAsCompleted()
     {
         $this->update([
             'status' => 'completed',
-            'completed_at' => now()
+            'completed_at' => now(),
         ]);
     }
 
     /**
      * Mark this queue item as cancelled
      */
-    public function markAsCancelled(): void
+    public function markAsCancelled()
     {
         $this->update([
-            'status' => 'cancelled'
+            'status' => 'cancelled',
+            'updated_at' => now(),
         ]);
     }
 
     /**
-     * Requeue this item
+     * Requeue this item (sets it aside for manual recall)
+     * NOTE: Requeued clients are NOT automatically called by "Call Next"
+     * They must be manually recalled using "Recall Now" button
      */
-    public function requeue(): void
+    public function requeue()
     {
         $this->update([
-            'status' => 'waiting',
-            'served_at' => null,
-            'queue_entered_at' => now()
+            'status' => 'requeued',
+            'served_at' => null, // Clear served_at since they're going back to queue
+            // 'updated_at' is automatically updated by Laravel (used for requeue ordering)
         ]);
     }
 
@@ -184,5 +192,39 @@ class Queue extends Model
     public function preRegistration()
     {
         return $this->belongsTo(PreRegistration::class, 'pre_registration_id');
+    }
+
+    /**
+     * Accessor: Get formatted owner ID type
+     */
+    public function getFormattedOwnerIdTypeAttribute(): ?string
+    {
+        return $this->govt_id_type ? ucwords(str_replace('_', ' ', $this->govt_id_type)) : null;
+    }
+
+    /**
+     * Accessor: Get formatted representative ID type
+     */
+    public function getFormattedRepIdTypeAttribute(): ?string
+    {
+        return $this->rep_govt_id_type ? ucwords(str_replace('_', ' ', $this->rep_govt_id_type)) : null;
+    }
+
+    /**
+     * Check if applicant is a representative
+     */
+    public function isRepresentative(): bool
+    {
+        return $this->applicant_type === 'representative';
+    }
+
+    /**
+     * Check if has complete representative information
+     */
+    public function hasRepresentativeInfo(): bool
+    {
+        return $this->isRepresentative() 
+            && !empty($this->rep_govt_id_type) 
+            && !empty($this->rep_govt_id_number);
     }
 }

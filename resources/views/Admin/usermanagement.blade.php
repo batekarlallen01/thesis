@@ -113,12 +113,12 @@
         </div>
     </a>
     
-    <!-- Mailbox -->
-    <a href="{{ route('admin.mailbox') }}" 
-       class="nav-link block font-georgia text-white {{ request()->routeIs('admin.mailbox') ? 'active' : '' }}">
+    <!-- Pre-Registrations -->
+    <a href="{{ route('admin.preregs') }}" 
+       class="nav-link block font-georgia text-white {{ request()->routeIs('admin.preregs') ? 'active' : '' }}">
         <div class="flex items-center space-x-3">
-            <i class="fas fa-envelope"></i>
-            <span>Mailbox</span>
+            <i class="fas fa-file-alt"></i>
+            <span>Pre-Registrations</span>
         </div>
     </a>
 </nav>

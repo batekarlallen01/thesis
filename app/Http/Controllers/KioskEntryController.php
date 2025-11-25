@@ -33,10 +33,16 @@ class KioskEntryController extends Controller
                 'pin_machinery' => 'nullable|string|max:100',
                 'purpose' => 'required|string',
                 'address' => 'required|string',
+                // Owner's ID (always required)
                 'govt_id_type' => 'required|string|max:100',
                 'govt_id_number' => 'required|string|max:100',
                 'issued_at' => 'nullable|string|max:100',
-                'issued_on' => 'nullable|date'
+                'issued_on' => 'nullable|date',
+                // Representative's ID (required when applicant_type is representative)
+                'rep_govt_id_type' => 'required_if:applicant_type,representative|nullable|string|max:100',
+                'rep_govt_id_number' => 'required_if:applicant_type,representative|nullable|string|max:100',
+                'rep_issued_at' => 'nullable|string|max:100',
+                'rep_issued_on' => 'nullable|date'
             ]);
 
             if ($validator->fails()) {
@@ -79,10 +85,17 @@ class KioskEntryController extends Controller
                     'purpose' => $data['purpose'],
                     'address' => $data['address'],
                     'applicant_type' => $data['applicant_type'],
+                    // Owner's ID (always stored)
                     'govt_id_type' => $data['govt_id_type'],
                     'govt_id_number' => $data['govt_id_number'],
                     'issued_at' => $data['issued_at'] ?? null,
                     'issued_on' => $data['issued_on'] ?? null,
+                    // Representative's ID (stored when applicable)
+                    'rep_govt_id_type' => $data['rep_govt_id_type'] ?? null,
+                    'rep_govt_id_number' => $data['rep_govt_id_number'] ?? null,
+                    'rep_issued_at' => $data['rep_issued_at'] ?? null,
+                    'rep_issued_on' => $data['rep_issued_on'] ?? null,
+                    // PIN fields
                     'pin_land' => $data['pin_land'] ?? null,
                     'pin_building' => $data['pin_building'] ?? null,
                     'pin_machinery' => $data['pin_machinery'] ?? null,
@@ -94,10 +107,16 @@ class KioskEntryController extends Controller
                         'pin_machinery' => $data['pin_machinery'] ?? null,
                         'purpose' => $data['purpose'],
                         'address' => $data['address'],
+                        // Owner's ID
                         'govt_id_type' => $data['govt_id_type'],
                         'govt_id_number' => $data['govt_id_number'],
                         'issued_at' => $data['issued_at'] ?? null,
-                        'issued_on' => $data['issued_on'] ?? null
+                        'issued_on' => $data['issued_on'] ?? null,
+                        // Representative's ID
+                        'rep_govt_id_type' => $data['rep_govt_id_type'] ?? null,
+                        'rep_govt_id_number' => $data['rep_govt_id_number'] ?? null,
+                        'rep_issued_at' => $data['rep_issued_at'] ?? null,
+                        'rep_issued_on' => $data['rep_issued_on'] ?? null
                     ]
                 ]);
 
@@ -117,10 +136,16 @@ class KioskEntryController extends Controller
                     'pin_machinery' => $data['pin_machinery'] ?? null,
                     'purpose' => $data['purpose'],
                     'address' => $data['address'],
+                    // Owner's ID
                     'govt_id_type' => $data['govt_id_type'],
                     'govt_id_number' => $data['govt_id_number'],
                     'issued_at' => $data['issued_at'] ?? null,
                     'issued_on' => $data['issued_on'] ?? null,
+                    // Representative's ID
+                    'rep_govt_id_type' => $data['rep_govt_id_type'] ?? null,
+                    'rep_govt_id_number' => $data['rep_govt_id_number'] ?? null,
+                    'rep_issued_at' => $data['rep_issued_at'] ?? null,
+                    'rep_issued_on' => $data['rep_issued_on'] ?? null,
                     'status' => 'in_queue',
                     'queue_id' => $queue->id,
                     'priority_type' => $priorityType

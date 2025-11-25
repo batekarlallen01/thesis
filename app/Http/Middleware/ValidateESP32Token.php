@@ -14,12 +14,9 @@ class ValidateESP32Token
         
         $validToken = env('ESP32_API_TOKEN');
         
-        if (!$validToken || $token !== $validToken) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized device'
-            ], 401);
-        }
+       if ($request->header('X-API-Token') !== config('app.esp32_token')) {
+    return response()->json(['error' => 'Unauthorized'], 401);
+}
         
         return $next($request);
     }

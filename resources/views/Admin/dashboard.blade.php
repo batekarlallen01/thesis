@@ -132,13 +132,13 @@
                         <span>Queue Status</span>
                     </div>
                 </a>
-                
-                <!-- Mailbox -->
-                <a href="{{ route('admin.mailbox') }}" 
-                   class="nav-link block font-georgia text-white {{ request()->routeIs('admin.mailbox') ? 'active' : '' }}">
+
+                <!-- Pre-Registrations -->
+                <a href="{{ route('admin.preregs') }}" 
+                   class="nav-link block font-georgia text-white {{ request()->routeIs('admin.preregs') ? 'active' : '' }}">
                     <div class="flex items-center space-x-3">
-                        <i class="fas fa-envelope"></i>
-                        <span>Mailbox</span>
+                        <i class="fas fa-file-alt"></i>
+                        <span>Pre-Registrations</span>
                     </div>
                 </a>
             </nav>
@@ -185,58 +185,182 @@
                     <p class="text-gray-600 mb-8 content-text" x-text="`Real-time statistics for ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`"></p>
                 </div>
                 
-                <!-- Stats Grid - Now with 4 cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <!-- Pre-Registered -->
-                    <div class="stat-card rounded-3xl shadow-xl p-10 hover:shadow-2xl transition-shadow duration-300">
-                        <div class="flex flex-col items-center text-center space-y-6">
-                            <div class="w-24 h-24 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <img src="{{ asset('img/pending.png') }}" alt="Pre-Registered" class="w-12 h-12 brightness-0 invert" />
+                <!-- Stats Grid - Now with 4 distinct cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Pending Review (Step 1) -->
+                    <div class="stat-card rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
+                        <div class="flex flex-col items-center text-center space-y-4">
+                            <div class="w-20 h-20 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-clock text-white text-3xl"></i>
                             </div>
                             <div class="w-full">
-                                <h3 class="text-5xl stat-number text-yellow-600 mb-3" x-text="stats.pre_registered || 0"></h3>
-                                <p class="text-base font-semibold text-gray-700 content-text">Pre-Registered</p>
+                                <h3 class="text-4xl stat-number text-orange-600 mb-2" x-text="stats.pending_review || 0"></h3>
+                                <p class="text-sm font-semibold text-gray-700 content-text">Pending Review</p>
+                                <p class="text-xs text-gray-500 content-text mt-1">Awaiting approval</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Approved & Waiting (Step 2) -->
+                    <div class="stat-card rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
+                        <div class="flex flex-col items-center text-center space-y-4">
+                            <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-check-circle text-white text-3xl"></i>
+                            </div>
+                            <div class="w-full">
+                                <h3 class="text-4xl stat-number text-blue-600 mb-2" x-text="stats.approved_waiting || 0"></h3>
+                                <p class="text-sm font-semibold text-gray-700 content-text">Approved & Waiting</p>
+                                <p class="text-xs text-gray-500 content-text mt-1">Ready to enter queue</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Cancelled Today -->
-                    <div class="stat-card rounded-3xl shadow-xl p-10 hover:shadow-2xl transition-shadow duration-300">
-                        <div class="flex flex-col items-center text-center space-y-6">
-                            <div class="w-24 h-24 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <img src="{{ asset('img/cancelled.png') }}" alt="Cancelled" class="w-12 h-12 brightness-0 invert" />
+                    <div class="stat-card rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
+                        <div class="flex flex-col items-center text-center space-y-4">
+                            <div class="w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-times-circle text-white text-3xl"></i>
                             </div>
                             <div class="w-full">
-                                <h3 class="text-5xl stat-number text-red-600 mb-3" x-text="stats.cancelled || 0"></h3>
-                                <p class="text-base font-semibold text-gray-700 content-text">Cancelled Today</p>
+                                <h3 class="text-4xl stat-number text-red-600 mb-2" x-text="stats.cancelled || 0"></h3>
+                                <p class="text-sm font-semibold text-gray-700 content-text">Cancelled Today</p>
+                                <p class="text-xs text-gray-500 content-text mt-1">Queue cancellations</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Completed Today -->
-                    <div class="stat-card rounded-3xl shadow-xl p-10 hover:shadow-2xl transition-shadow duration-300">
-                        <div class="flex flex-col items-center text-center space-y-6">
-                            <div class="w-24 h-24 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <img src="{{ asset('img/complete.png') }}" alt="Completed" class="w-12 h-12 brightness-0 invert" />
+                    <div class="stat-card rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
+                        <div class="flex flex-col items-center text-center space-y-4">
+                            <div class="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-check-double text-white text-3xl"></i>
                             </div>
                             <div class="w-full">
-                                <h3 class="text-5xl stat-number text-green-600 mb-3" x-text="stats.completed || 0"></h3>
-                                <p class="text-base font-semibold text-gray-700 content-text">Completed Today</p>
+                                <h3 class="text-4xl stat-number text-green-600 mb-2" x-text="stats.completed || 0"></h3>
+                                <p class="text-sm font-semibold text-gray-700 content-text">Completed Today</p>
+                                <p class="text-xs text-gray-500 content-text mt-1">Successfully served</p>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Mailbox Messages -->
-                    <div class="stat-card rounded-3xl shadow-xl p-10 hover:shadow-2xl transition-shadow duration-300">
-                        <div class="flex flex-col items-center text-center space-y-6">
-                            <div class="w-24 h-24 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                </svg>
+                <!-- Additional Stats Grid -->
+                <div class="mt-12">
+                    <h3 class="text-2xl font-georgia font-bold text-gray-900 mb-6">Queue Activity</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- Currently Waiting in Queue -->
+                        <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-users text-purple-600 text-xl"></i>
+                                </div>
+                                <span class="text-3xl stat-number text-purple-600" x-text="stats.waiting || 0"></span>
                             </div>
-                            <div class="w-full">
-                                <h3 class="text-5xl stat-number text-purple-600 mb-3" x-text="stats.mailbox_messages || 0"></h3>
-                                <p class="text-base font-semibold text-gray-700 content-text">Mailbox Messages</p>
+                            <p class="text-sm font-semibold text-gray-700 content-text">Waiting in Queue</p>
+                            <p class="text-xs text-gray-500 content-text mt-1">Active queue</p>
+                        </div>
+
+                        <!-- Currently Being Served -->
+                        <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-hand-holding text-indigo-600 text-xl"></i>
+                                </div>
+                                <span class="text-3xl stat-number text-indigo-600" x-text="stats.serving || 0"></span>
+                            </div>
+                            <p class="text-sm font-semibold text-gray-700 content-text">Now Serving</p>
+                            <p class="text-xs text-gray-500 content-text mt-1">Being processed</p>
+                        </div>
+
+                        <!-- Total Entries Today -->
+                        <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-calendar-day text-cyan-600 text-xl"></i>
+                                </div>
+                                <span class="text-3xl stat-number text-cyan-600" x-text="stats.total_today || 0"></span>
+                            </div>
+                            <p class="text-sm font-semibold text-gray-700 content-text">Total Today</p>
+                            <p class="text-xs text-gray-500 content-text mt-1">All entries</p>
+                        </div>
+
+                        <!-- Requeued -->
+                        <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-redo text-amber-600 text-xl"></i>
+                                </div>
+                                <span class="text-3xl stat-number text-amber-600" x-text="stats.requeued || 0"></span>
+                            </div>
+                            <p class="text-sm font-semibold text-gray-700 content-text">Requeued</p>
+                            <p class="text-xs text-gray-500 content-text mt-1">Awaiting recall</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority & Entry Type Breakdown -->
+                <div class="mt-12">
+                    <h3 class="text-2xl font-georgia font-bold text-gray-900 mb-6">Queue Breakdown</h3>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Priority Types -->
+                        <div class="bg-white rounded-2xl shadow-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4 content-text flex items-center">
+                                <i class="fas fa-star text-yellow-500 mr-2"></i>
+                                Priority Status
+                            </h4>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-wheelchair text-green-600 mr-3"></i>
+                                        <span class="font-medium text-gray-700 content-text">PWD</span>
+                                    </div>
+                                    <span class="text-2xl stat-number text-green-600" x-text="stats.pwd_waiting || 0"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-user-clock text-blue-600 mr-3"></i>
+                                        <span class="font-medium text-gray-700 content-text">Senior Citizen</span>
+                                    </div>
+                                    <span class="text-2xl stat-number text-blue-600" x-text="stats.senior_waiting || 0"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-user text-gray-600 mr-3"></i>
+                                        <span class="font-medium text-gray-700 content-text">Regular</span>
+                                    </div>
+                                    <span class="text-2xl stat-number text-gray-600" x-text="stats.regular_waiting || 0"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Entry Types -->
+                        <div class="bg-white rounded-2xl shadow-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4 content-text flex items-center">
+                                <i class="fas fa-door-open text-indigo-500 mr-2"></i>
+                                Entry Method
+                            </h4>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-desktop text-indigo-600 mr-3"></i>
+                                        <span class="font-medium text-gray-700 content-text">Kiosk (Direct)</span>
+                                    </div>
+                                    <span class="text-2xl stat-number text-indigo-600" x-text="stats.kiosk_waiting || 0"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-file-import text-purple-600 mr-3"></i>
+                                        <span class="font-medium text-gray-700 content-text">Pre-Registration</span>
+                                    </div>
+                                    <span class="text-2xl stat-number text-purple-600" x-text="stats.prereg_waiting || 0"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-chart-line text-emerald-600 mr-3"></i>
+                                        <span class="font-medium text-gray-700 content-text">Total Waiting</span>
+                                    </div>
+                                    <span class="text-2xl stat-number text-emerald-600" x-text="(stats.kiosk_waiting || 0) + (stats.prereg_waiting || 0)"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -297,12 +421,21 @@
                         const data = await response.json();
                         console.log('Stats updated:', data);
 
-                        // Update the stats with new field names
+                        // Updated to use all new stat fields
                         this.stats = {
-                            pre_registered: data.pre_registered || 0,
+                            pending_review: data.pending_review || 0,
+                            approved_waiting: data.approved_waiting || 0,
                             cancelled: data.cancelled || 0,
                             completed: data.completed || 0,
-                            mailbox_messages: data.mailbox_messages || 0
+                            waiting: data.waiting || 0,
+                            serving: data.serving || 0,
+                            total_today: data.total_today || 0,
+                            requeued: data.requeued || 0,
+                            pwd_waiting: data.pwd_waiting || 0,
+                            senior_waiting: data.senior_waiting || 0,
+                            regular_waiting: data.regular_waiting || 0,
+                            kiosk_waiting: data.kiosk_waiting || 0,
+                            prereg_waiting: data.prereg_waiting || 0
                         };
 
                     } catch (error) {
@@ -314,7 +447,7 @@
                     this.refreshStatsOnly();
                     setInterval(() => {
                         this.refreshStatsOnly();
-                    }, 15000);
+                    }, 15000); // Refresh every 15 seconds
                 }
             };
         }

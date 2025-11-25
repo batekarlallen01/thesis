@@ -56,7 +56,7 @@
       <div class="z-10 text-center text-white px-4">
         <h1 class="text-4xl sm:text-5xl font-extrabold mb-4 drop-shadow" data-i18n="welcome_to">Welcome to North Caloocan</h1>
         <p class="text-lg sm:text-xl font-light mb-8 drop-shadow" data-i18n="city_services">City Assessment Department Online Services</p>
-        <button onclick="location.href='{{ url('/services') }}'"
+        <button onclick="location.href='{{ url('/pre-regform') }}'"
           class="bg-amber-600 hover:bg-amber-700 px-8 py-4 text-lg font-semibold rounded-2xl shadow-lg 
                  transition duration-300 transform hover:scale-105 flex items-center justify-center gap-2 mx-auto">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
@@ -124,57 +124,26 @@ For Drop-off of Requirements, follow the same steps, but instead of a QR code, y
 
   <!-- SCRIPTS -->
   <script>
-    // Load Laravel Translations
-    const translations = {
-      en: @json(__('home')),
-      tl: @json(__('home', [], 'tl'))
-    };
+  // Scroll indicator
+  const indicator = document.getElementById('scroll-indicator');
+  const main = document.querySelector('main');
 
-    // Change language
-    function changeLang(lang) {
-      // Update all [data-i18n] elements
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (translations[lang][key] !== undefined) {
-          el.textContent = translations[lang][key];
-        }
-      });
+  main.addEventListener('scroll', () => {
+    const scrollTop = main.scrollTop;
+    const scrollHeight = main.scrollHeight - main.clientHeight;
+    const scrollPercent = (scrollTop / scrollHeight) * 100;
+    indicator.style.width = scrollPercent + "%";
+  });
 
-      // Save to localStorage
-      localStorage.setItem('siteLang', lang);
-    }
+  // Scroll to How to Use section
+  const howToUseBtn = document.getElementById('howToUseBtn');
+  const howToUseSection = document.getElementById('howToUseSection');
 
-    // Get saved language
-    function getSavedLang() {
-      return localStorage.getItem('siteLang') || 'en';
-    }
+  howToUseBtn.addEventListener('click', () => {
+    howToUseSection.scrollIntoView({ behavior: 'smooth' });
+  });
+</script>
 
-    // Apply translations on load
-    document.addEventListener('DOMContentLoaded', () => {
-      const savedLang = getSavedLang();
-      document.getElementById('language-select').value = savedLang;
-      changeLang(savedLang);
-    });
-
-    // Scroll indicator
-    const indicator = document.getElementById('scroll-indicator');
-    const main = document.querySelector('main');
-
-    main.addEventListener('scroll', () => {
-      const scrollTop = main.scrollTop;
-      const scrollHeight = main.scrollHeight - main.clientHeight;
-      const scrollPercent = (scrollTop / scrollHeight) * 100;
-      indicator.style.width = scrollPercent + "%";
-    });
-
-    // Scroll to How to Use section
-    const howToUseBtn = document.getElementById('howToUseBtn');
-    const howToUseSection = document.getElementById('howToUseSection');
-
-    howToUseBtn.addEventListener('click', () => {
-      howToUseSection.scrollIntoView({ behavior: 'smooth' });
-    });
-  </script>
 
 </body>
 </html>

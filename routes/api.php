@@ -13,9 +13,10 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// 🔹 ESP32 & Mailbox routes (NO CSRF)
-Route::post('/mailbox-submission', [MailboxSubmissionController::class, 'store']);
-
+// 🔹 ESP32 Protected Routes (with token authentication)
 Route::middleware(['esp32.token'])->group(function () {
     Route::post('/verify-pin', [MailboxSubmissionController::class, 'verifyPin']);
 });
+
+// 🔹 Public mailbox submission route (if needed without authentication)
+Route::post('/mailbox-submission', [MailboxSubmissionController::class, 'store']);

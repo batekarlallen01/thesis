@@ -10,6 +10,7 @@ class PreRegistration extends Model
     use HasFactory;
 
     protected $fillable = [
+        // Basic info
         'service_type',
         'applicant_type',
         'number_of_copies',
@@ -18,26 +19,48 @@ class PreRegistration extends Model
         'is_pwd',
         'pwd_id',
         'purpose',
-        'govt_id_type',
-        'govt_id_number',
-        'issued_at',
-        'issued_on',
         'address',
         'email',
-        'pin_numbers',
+        
+        // Document uploads
+        'owner_id_image',
+        'spa_image',
+        'rep_id_image',
+        'tax_decl_form',
+        'title',
+        'tax_payment',
+        'latest_tax_decl',
+        'deed_of_sale',
+        'transfer_tax_receipt',
+        'car_from_bir',
+        
+        // Status and Review
+        'status',
+        'disapproval_reasons',
+        'disapproval_other_reason',
+        'reviewed_by',
+        'reviewed_at',
+        'approved_at',
+        'disapproved_at',
+        
+        // QR and Queue
         'qr_token',
         'qr_expires_at',
         'pin_code',
-        'has_entered_queue',
         'qr_image_path',
+        'has_entered_queue',
+        'pin_numbers',
     ];
 
     protected $casts = [
         'is_pwd' => 'boolean',
         'has_entered_queue' => 'boolean',
         'qr_expires_at' => 'datetime',
-        'issued_on' => 'date',
         'pin_numbers' => 'array',
+        'disapproval_reasons' => 'array',
+        'approved_at' => 'datetime',
+        'reviewed_at' => 'datetime',
+        'disapproved_at' => 'datetime',
     ];
 
     /**
@@ -88,7 +111,6 @@ class PreRegistration extends Model
 
     /**
      * Get priority type - Used by QREntryController
-     * This method calculates priority based on age and PWD status
      */
     public function getPriorityType(): string
     {

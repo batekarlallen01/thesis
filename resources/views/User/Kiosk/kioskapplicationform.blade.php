@@ -23,28 +23,78 @@
     input:focus, button:focus, select:focus, textarea:focus { outline: none; }
     .priority-badge { animation: pulse-glow 2s ease-in-out infinite; }
     @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); } 50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); } }
-    @media print {
-      body * { visibility: hidden; }
-      #printReceipt, #printReceipt * { visibility: visible; }
-      #printReceipt { position: absolute; left: 0; top: 0; width: 100%; }
-      .print-receipt { width: 80mm; margin: 0 auto; padding: 10px; font-family: 'Courier New', monospace; font-size: 12px; }
-      .receipt-header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
-      .receipt-logo { width: 50px; height: 50px; margin: 0 auto 8px; }
-      .receipt-title { font-size: 14px; font-weight: bold; margin: 3px 0; }
-      .receipt-subtitle { font-size: 10px; margin: 2px 0; }
-      .queue-number-section { text-align: center; margin: 15px 0; padding: 10px; border: 3px solid #000; }
-      .queue-label { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
-      .queue-number { font-size: 42px; font-weight: bold; letter-spacing: 3px; line-height: 1; }
-      .priority-badge-print { margin-top: 8px; padding: 4px 8px; border: 2px solid #000; display: inline-block; font-size: 11px; font-weight: bold; }
-      .receipt-info { margin: 10px 0; font-size: 11px; }
-      .info-row { display: flex; justify-content: space-between; margin: 5px 0; padding: 3px 0; border-bottom: 1px dotted #666; }
-      .info-label { font-weight: bold; width: 45%; }
-      .info-value { width: 55%; text-align: right; word-wrap: break-word; }
-      .receipt-footer { text-align: center; margin-top: 15px; padding-top: 10px; border-top: 2px dashed #000; font-size: 9px; }
-      .footer-note { margin: 3px 0; }
-      @page { margin: 0; }
+    
+    /* Back Button */
+    .back-button {
+      position: fixed;
+      top: 2rem;
+      left: 2rem;
+      background: white;
+      color: #4f46e5;
+      border: 2px solid #4f46e5;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      z-index: 1000;
     }
-    #printReceipt { display: none; }
+    
+    .back-button:hover {
+      background: #4f46e5;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.3);
+    }
+    
+    /* Idle Timer Display */
+    .idle-timer {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: rgba(255,255,255,0.95);
+      color: #4f46e5;
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      z-index: 1000;
+      display: none;
+      border: 2px solid #e0e7ff;
+    }
+    
+    .idle-timer.warning {
+      background: #fef3c7;
+      color: #92400e;
+      border-color: #fbbf24;
+      animation: pulse-warning 1s ease-in-out infinite;
+    }
+    
+    @keyframes pulse-warning {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    @media (max-width: 768px) {
+      .back-button {
+        top: 1rem;
+        left: 1rem;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+      }
+      
+      .idle-timer {
+        bottom: 1rem;
+        right: 1rem;
+        font-size: 0.8rem;
+        padding: 0.6rem 1rem;
+      }
+    }
   </style>
 
   <!-- DEFINE ALPINE FUNCTION BEFORE Alpine.js LOADS -->
@@ -63,10 +113,16 @@
           pinBuilding: '',
           pinMachinery: '',
           purpose: '',
-          govtIdType: '',
-          govtIdNumber: '',
-          issuedAt: '',
-          issuedOn: '',
+          // Owner's ID (always required)
+          ownerGovtIdType: '',
+          ownerGovtIdNumber: '',
+          ownerIssuedAt: '',
+          ownerIssuedOn: '',
+          // Representative's ID (only when representative is selected)
+          repGovtIdType: '',
+          repGovtIdNumber: '',
+          repIssuedAt: '',
+          repIssuedOn: '',
           address: '',
         },
         showModal: false,
@@ -74,6 +130,79 @@
         isSubmitting: false,
         queueNumber: '',
         currentDateTime: '',
+        
+        // Idle timer properties
+        idleTimer: null,
+        countdownInterval: null,
+        remainingTime: 120,
+        IDLE_TIMEOUT: 120000, // 2 minutes
+        WARNING_TIME: 30000, // 30 seconds
+
+        init() {
+          this.startIdleTimer();
+          this.setupIdleListeners();
+        },
+
+        startIdleTimer() {
+          this.clearIdleTimer();
+          this.remainingTime = 120;
+          const timerEl = document.getElementById('idle-timer');
+          if (timerEl) {
+            timerEl.style.display = 'none';
+            timerEl.classList.remove('warning');
+          }
+          
+          this.idleTimer = setTimeout(() => {
+            console.log('⏰ Idle timeout - returning to home');
+            this.goBackHome();
+          }, this.IDLE_TIMEOUT);
+          
+          // Show countdown at 30 seconds
+          setTimeout(() => {
+            this.showCountdown();
+          }, this.IDLE_TIMEOUT - this.WARNING_TIME);
+        },
+        
+        clearIdleTimer() {
+          if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = null;
+          }
+          if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+            this.countdownInterval = null;
+          }
+        },
+        
+        showCountdown() {
+          const timerEl = document.getElementById('idle-timer');
+          const countdownEl = document.getElementById('countdown');
+          if (!timerEl || !countdownEl) return;
+          
+          this.remainingTime = 30;
+          timerEl.style.display = 'block';
+          timerEl.classList.add('warning');
+          countdownEl.textContent = this.remainingTime;
+          
+          this.countdownInterval = setInterval(() => {
+            this.remainingTime--;
+            countdownEl.textContent = this.remainingTime;
+            
+            if (this.remainingTime <= 0) {
+              clearInterval(this.countdownInterval);
+            }
+          }, 1000);
+        },
+        
+        resetIdleTimer() {
+          this.startIdleTimer();
+        },
+        
+        setupIdleListeners() {
+          ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+            document.addEventListener(event, () => this.resetIdleTimer(), true);
+          });
+        },
 
         get priorityStatus() {
           if (this.form.isPwdString === 'yes' && this.form.pwdId) {
@@ -93,13 +222,20 @@
                  this.form.age &&
                  this.form.isPwdString &&
                  this.form.purpose && 
-                 this.form.govtIdType && 
-                 this.form.govtIdNumber && 
+                 this.form.ownerGovtIdType && 
+                 this.form.ownerGovtIdNumber && 
                  this.form.address;
           
-          if (this.form.isPwdString === 'yes') {
-            return baseValid && this.form.pwdId;
+          // Check PWD ID if applicable
+          if (this.form.isPwdString === 'yes' && !this.form.pwdId) {
+            return false;
           }
+
+          // Check representative ID if representative is selected
+          if (this.form.applicantType === 'representative') {
+            return baseValid && this.form.repGovtIdType && this.form.repGovtIdNumber;
+          }
+
           return baseValid;
         },
 
@@ -145,10 +281,16 @@
                 pin_machinery: this.form.pinMachinery,
                 purpose: this.form.purpose,
                 address: this.form.address,
-                govt_id_type: this.form.govtIdType,
-                govt_id_number: this.form.govtIdNumber,
-                issued_at: this.form.issuedAt,
-                issued_on: this.form.issuedOn
+                // Owner's ID
+                govt_id_type: this.form.ownerGovtIdType,
+                govt_id_number: this.form.ownerGovtIdNumber,
+                issued_at: this.form.ownerIssuedAt,
+                issued_on: this.form.ownerIssuedOn,
+                // Representative's ID (if applicable)
+                rep_govt_id_type: this.form.applicantType === 'representative' ? this.form.repGovtIdType : null,
+                rep_govt_id_number: this.form.applicantType === 'representative' ? this.form.repGovtIdNumber : null,
+                rep_issued_at: this.form.applicantType === 'representative' ? this.form.repIssuedAt : null,
+                rep_issued_on: this.form.applicantType === 'representative' ? this.form.repIssuedOn : null,
               })
             });
 
@@ -159,6 +301,12 @@
               console.log('Success response:', data);
               this.queueNumber = data.data.queue_number;
               this.successModal = true;
+              
+              // Auto return to home after 5 seconds on success
+              setTimeout(() => {
+                console.log('✅ Successful submission - returning to home');
+                this.goBackHome();
+              }, 5000);
             } else {
               const errorData = await response.json().catch(() => ({}));
               console.error('Server error:', errorData);
@@ -192,10 +340,14 @@
             pinBuilding: '',
             pinMachinery: '',
             purpose: '',
-            govtIdType: '',
-            govtIdNumber: '',
-            issuedAt: '',
-            issuedOn: '',
+            ownerGovtIdType: '',
+            ownerGovtIdNumber: '',
+            ownerIssuedAt: '',
+            ownerIssuedOn: '',
+            repGovtIdType: '',
+            repGovtIdNumber: '',
+            repIssuedAt: '',
+            repIssuedOn: '',
             address: '',
           };
           this.successModal = false;
@@ -206,7 +358,17 @@
     };
   </script>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-gray-50 min-h-screen" x-data="taxDeclarationApp()">
+<body class="bg-gradient-to-br from-blue-50 to-gray-50 min-h-screen" x-data="taxDeclarationApp()" x-init="init()">
+
+  <!-- Back Button -->
+  <button class="back-button" @click="goBackHome()">
+    ← Back to Home
+  </button>
+  
+  <!-- Idle Timer Display -->
+  <div class="idle-timer" id="idle-timer">
+    Returning to home in <span id="countdown">120</span>s
+  </div>
 
   <div class="max-w-4xl mx-auto mt-4 p-6 md:p-8">
     <div class="text-center mb-8">
@@ -226,6 +388,7 @@
     </div>
 
     <div class="bg-white shadow-lg rounded-xl p-6 md:p-8 space-y-6">
+      <!-- PERSONAL INFORMATION -->
       <div class="bg-purple-50 p-6 rounded-lg">
         <h2 class="text-xl font-semibold text-purple-900 mb-4">PERSONAL INFORMATION:</h2>
         <div class="space-y-4">
@@ -245,6 +408,7 @@
         </div>
       </div>
 
+      <!-- PWD INFORMATION -->
       <div class="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
         <h2 class="text-xl font-semibold text-blue-900 mb-4">PWD INFORMATION:</h2>
         <div class="space-y-4">
@@ -269,6 +433,7 @@
         </div>
       </div>
 
+      <!-- APPLICANT TYPE -->
       <div class="bg-green-50 p-6 rounded-lg">
         <h2 class="text-xl font-semibold text-green-900 mb-4">APPLICANT TYPE:</h2>
         <div class="space-y-3">
@@ -283,6 +448,7 @@
         </div>
       </div>
 
+      <!-- REQUEST FOR -->
       <div class="bg-indigo-50 p-6 rounded-lg">
         <h2 class="text-xl font-semibold text-indigo-900 mb-4">REQUEST FOR:</h2>
         <div class="space-y-3">
@@ -317,11 +483,13 @@
         </div>
       </div>
 
+      <!-- NUMBER OF COPIES -->
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">Number of Copies <span class="text-red-500">*</span></label>
         <input type="number" x-model="form.numberOfCopies" min="1" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
       </div>
 
+      <!-- PROPERTY INDEX NUMBER -->
       <div class="bg-yellow-50 p-6 rounded-lg">
         <h2 class="text-xl font-semibold text-yellow-900 mb-4">PROPERTY INDEX NUMBER (PIN):</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -340,17 +508,20 @@
         </div>
       </div>
 
+      <!-- PURPOSE -->
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">PURPOSE <span class="text-red-500">*</span></label>
         <textarea x-model="form.purpose" placeholder="State the purpose of this request" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"></textarea>
       </div>
 
-      <div class="bg-blue-50 p-6 rounded-lg">
-        <h2 class="text-xl font-semibold text-blue-900 mb-4">GOVERNMENT ISSUED ID:</h2>
+      <!-- OWNER'S GOVERNMENT ISSUED ID (Always Required) -->
+      <div class="bg-blue-50 p-6 rounded-lg border-2 border-blue-300">
+        <h2 class="text-xl font-semibold text-blue-900 mb-2">PROPERTY OWNER'S GOVERNMENT ISSUED ID:</h2>
+        <p class="text-sm text-blue-700 mb-4">📋 Owner's identification is always required</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">ID Type <span class="text-red-500">*</span></label>
-            <select x-model="form.govtIdType" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Owner's ID Type <span class="text-red-500">*</span></label>
+            <select x-model="form.ownerGovtIdType" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
               <option value="">Select ID Type</option>
               <option value="drivers_license">Driver's License</option>
               <option value="passport">Passport</option>
@@ -364,25 +535,62 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">ID Number <span class="text-red-500">*</span></label>
-            <input type="text" x-model="form.govtIdNumber" placeholder="Enter ID number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Owner's ID Number <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.ownerGovtIdNumber" placeholder="Enter owner's ID number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Issued at</label>
-            <input type="text" x-model="form.issuedAt" placeholder="Place where ID was issued" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <input type="text" x-model="form.ownerIssuedAt" placeholder="Place where ID was issued" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Issued on</label>
-            <input type="date" x-model="form.issuedOn" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <input type="date" x-model="form.ownerIssuedOn" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
           </div>
         </div>
       </div>
 
+      <!-- REPRESENTATIVE'S GOVERNMENT ISSUED ID (Only when representative is selected) -->
+      <div x-show="form.applicantType === 'representative'" x-transition class="bg-amber-50 p-6 rounded-lg border-2 border-amber-300">
+        <h2 class="text-xl font-semibold text-amber-900 mb-2">REPRESENTATIVE'S GOVERNMENT ISSUED ID:</h2>
+        <p class="text-sm text-amber-700 mb-4">👤 Representative's identification is required when applying on behalf of the owner</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Representative's ID Type <span class="text-red-500">*</span></label>
+            <select x-model="form.repGovtIdType" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              <option value="">Select ID Type</option>
+              <option value="drivers_license">Driver's License</option>
+              <option value="passport">Passport</option>
+              <option value="umid">UMID</option>
+              <option value="sss">SSS ID</option>
+              <option value="philhealth">PhilHealth ID</option>
+              <option value="postal">Postal ID</option>
+              <option value="voters">Voter's ID</option>
+              <option value="national_id">National ID</option>
+              <option value="prc">PRC ID</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Representative's ID Number <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.repGovtIdNumber" placeholder="Enter representative's ID number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Issued at</label>
+            <input type="text" x-model="form.repIssuedAt" placeholder="Place where ID was issued" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Issued on</label>
+            <input type="date" x-model="form.repIssuedOn" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+        </div>
+      </div>
+
+      <!-- ADDRESS -->
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">ADDRESS <span class="text-red-500">*</span></label>
         <textarea x-model="form.address" placeholder="Enter complete address" rows="2" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"></textarea>
       </div>
 
+      <!-- SUBMIT BUTTON -->
       <div class="pt-6 border-t">
         <button @click="showRequirementsModal" type="button"
                 :disabled="!isFormValid"
@@ -413,7 +621,7 @@
         <div class="mb-4 space-y-3">
           <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded-md shadow-sm animate-fade-in">
             <strong>Owner's Valid ID</strong>
-            <p class="text-green-700 text-xs mt-1">Government-issued photo ID</p>
+            <p class="text-green-700 text-xs mt-1">Government-issued photo ID of the property owner</p>
           </div>
         </div>
       </template>
@@ -421,11 +629,16 @@
       <template x-if="form.applicantType === 'representative'">
         <div class="mb-4 space-y-3">
           <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-md shadow-sm">
-            <strong>Special Power of Attorney (SPA)</strong>
-            <p class="text-blue-700 text-xs mt-1">Must be notarized</p>
+            <strong>Owner's Valid ID</strong>
+            <p class="text-blue-700 text-xs mt-1">Government-issued photo ID of the property owner</p>
           </div>
-          <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-md shadow-sm">
+          <div class="bg-amber-50 border-l-4 border-amber-500 p-3 rounded-md shadow-sm">
             <strong>Representative's Valid ID</strong>
+            <p class="text-amber-700 text-xs mt-1">Government-issued photo ID of the representative</p>
+          </div>
+          <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded-md shadow-sm">
+            <strong>Special Power of Attorney (SPA)</strong>
+            <p class="text-red-700 text-xs mt-1">Must be notarized</p>
           </div>
         </div>
       </template>
