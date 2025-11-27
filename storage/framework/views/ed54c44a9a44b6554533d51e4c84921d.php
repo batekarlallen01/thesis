@@ -23,6 +23,78 @@
     input:focus, button:focus, select:focus, textarea:focus { outline: none; }
     .priority-badge { animation: pulse-glow 2s ease-in-out infinite; }
     @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); } 50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); } }
+    
+    /* Back Button */
+    .back-button {
+      position: fixed;
+      top: 2rem;
+      left: 2rem;
+      background: white;
+      color: #4f46e5;
+      border: 2px solid #4f46e5;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    
+    .back-button:hover {
+      background: #4f46e5;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.3);
+    }
+    
+    /* Idle Timer Display */
+    .idle-timer {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: rgba(255,255,255,0.95);
+      color: #4f46e5;
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      z-index: 1000;
+      display: none;
+      border: 2px solid #e0e7ff;
+    }
+    
+    .idle-timer.warning {
+      background: #fef3c7;
+      color: #92400e;
+      border-color: #fbbf24;
+      animation: pulse-warning 1s ease-in-out infinite;
+    }
+    
+    @keyframes pulse-warning {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    @media (max-width: 768px) {
+      .back-button {
+        top: 1rem;
+        left: 1rem;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+      }
+      
+      .idle-timer {
+        bottom: 1rem;
+        right: 1rem;
+        font-size: 0.8rem;
+        padding: 0.6rem 1rem;
+      }
+    }
   </style>
 
   <!-- DEFINE ALPINE FUNCTION BEFORE Alpine.js LOADS -->
@@ -58,6 +130,79 @@
         isSubmitting: false,
         queueNumber: '',
         currentDateTime: '',
+        
+        // Idle timer properties
+        idleTimer: null,
+        countdownInterval: null,
+        remainingTime: 120,
+        IDLE_TIMEOUT: 120000, // 2 minutes
+        WARNING_TIME: 30000, // 30 seconds
+
+        init() {
+          this.startIdleTimer();
+          this.setupIdleListeners();
+        },
+
+        startIdleTimer() {
+          this.clearIdleTimer();
+          this.remainingTime = 120;
+          const timerEl = document.getElementById('idle-timer');
+          if (timerEl) {
+            timerEl.style.display = 'none';
+            timerEl.classList.remove('warning');
+          }
+          
+          this.idleTimer = setTimeout(() => {
+            console.log('⏰ Idle timeout - returning to home');
+            this.goBackHome();
+          }, this.IDLE_TIMEOUT);
+          
+          // Show countdown at 30 seconds
+          setTimeout(() => {
+            this.showCountdown();
+          }, this.IDLE_TIMEOUT - this.WARNING_TIME);
+        },
+        
+        clearIdleTimer() {
+          if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = null;
+          }
+          if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+            this.countdownInterval = null;
+          }
+        },
+        
+        showCountdown() {
+          const timerEl = document.getElementById('idle-timer');
+          const countdownEl = document.getElementById('countdown');
+          if (!timerEl || !countdownEl) return;
+          
+          this.remainingTime = 30;
+          timerEl.style.display = 'block';
+          timerEl.classList.add('warning');
+          countdownEl.textContent = this.remainingTime;
+          
+          this.countdownInterval = setInterval(() => {
+            this.remainingTime--;
+            countdownEl.textContent = this.remainingTime;
+            
+            if (this.remainingTime <= 0) {
+              clearInterval(this.countdownInterval);
+            }
+          }, 1000);
+        },
+        
+        resetIdleTimer() {
+          this.startIdleTimer();
+        },
+        
+        setupIdleListeners() {
+          ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+            document.addEventListener(event, () => this.resetIdleTimer(), true);
+          });
+        },
 
         get priorityStatus() {
           if (this.form.isPwdString === 'yes' && this.form.pwdId) {
@@ -156,6 +301,12 @@
               console.log('Success response:', data);
               this.queueNumber = data.data.queue_number;
               this.successModal = true;
+              
+              // Auto return to home after 5 seconds on success
+              setTimeout(() => {
+                console.log('✅ Successful submission - returning to home');
+                this.goBackHome();
+              }, 5000);
             } else {
               const errorData = await response.json().catch(() => ({}));
               console.error('Server error:', errorData);
@@ -174,11 +325,6 @@
             console.error('Network error:', err);
             alert('Failed to submit. Check your connection and try again.');
           }
-        },
-
-        goBackHome() {
-          // Redirect to kiosk home page
-          window.location.href = '/kioskhome';
         },
 
         resetForm() {
@@ -212,7 +358,17 @@
     };
   </script>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-gray-50 min-h-screen" x-data="taxDeclarationApp()">
+<body class="bg-gradient-to-br from-blue-50 to-gray-50 min-h-screen" x-data="taxDeclarationApp()" x-init="init()">
+
+  <!-- Back Button -->
+  <button class="back-button" @click="goBackHome()">
+    ← Back to Home
+  </button>
+  
+  <!-- Idle Timer Display -->
+  <div class="idle-timer" id="idle-timer">
+    Returning to home in <span id="countdown">120</span>s
+  </div>
 
   <div class="max-w-4xl mx-auto mt-4 p-6 md:p-8">
     <div class="text-center mb-8">
@@ -524,8 +680,8 @@
       </div>
       <p class="text-gray-600 mb-4">Please wait for your number to be called.</p>
       <p class="text-sm text-indigo-600 font-semibold mb-6">✓ Receipt has been printed</p>
-      <button @click="goBackHome()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-medium transition">
-        Complete
+      <button @click="resetForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-medium transition">
+        Submit Another Application
       </button>
     </div>
   </div>
